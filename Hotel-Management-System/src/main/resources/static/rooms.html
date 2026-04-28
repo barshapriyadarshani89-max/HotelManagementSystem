@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Rooms — Hotel Management</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">🏨 HotelMS</div>
+  <a href="index.html"    class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+  <a href="rooms.html"    class="nav-item active"><span class="nav-icon">🛏️</span> Rooms</a>
+  <a href="guests.html"   class="nav-item"><span class="nav-icon">👥</span> Guests</a>
+  <a href="bookings.html" class="nav-item"><span class="nav-icon">📅</span> Bookings</a>
+  <a href="billing.html"  class="nav-item"><span class="nav-icon">💰</span> Billing</a>
+  <a href="staff.html"    class="nav-item"><span class="nav-icon">👷</span> Staff</a>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <h1>Rooms</h1>
+    <p>Manage all hotel rooms</p>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <h2>All Rooms</h2>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search rooms..." oninput="filterRooms()">
+        <button class="btn btn-primary" onclick="openModal()">+ Add Room</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Room No.</th>
+          <th>Type</th>
+          <th>Price/Night</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="roomsTable">
+        <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Room</h2>
+    <input type="hidden" id="roomId">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Room Number</label>
+        <input type="text" id="roomNumber" placeholder="e.g. 101">
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select id="roomType">
+          <option>Single</option>
+          <option>Double</option>
+          <option>Suite</option>
+          <option>Deluxe</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Price Per Night (₹)</label>
+        <input type="number" id="roomPrice" placeholder="e.g. 2500">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="roomStatus">
+          <option>AVAILABLE</option>
+          <option>OCCUPIED</option>
+          <option>MAINTENANCE</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveRoom()">Save Room</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8080/api';
+let allRooms = [];
+
+async function loadRooms() {
+  allRooms = await fetch(`${API}/rooms`).then(r => r.json());
+  renderRooms(allRooms);
+}
+
+function renderRooms(rooms) {
+  const tbody = document.getElementById('roomsTable');
+  if (rooms.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No rooms found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rooms.map(r => `
+    <tr>
+      <td><strong>${r.roomNumber}</strong></td>
+      <td>${r.type}</td>
+      <td>₹${r.pricePerNight}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn btn-sm btn-primary" onclick="editRoom(${r.id})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteRoom(${r.id})">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function statusBadge(status) {
+  const map = { AVAILABLE: 'badge-success', OCCUPIED: 'badge-danger', MAINTENANCE: 'badge-warning' };
+  return `<span class="badge ${map[status] || 'badge-gray'}">${status}</span>`;
+}
+
+function filterRooms() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  renderRooms(allRooms.filter(r =>
+    r.roomNumber.toLowerCase().includes(q) || r.type.toLowerCase().includes(q)
+  ));
+}
+
+function openModal() {
+  document.getElementById('modalTitle').textContent = 'Add Room';
+  document.getElementById('roomId').value = '';
+  document.getElementById('roomNumber').value = '';
+  document.getElementById('roomPrice').value = '';
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function editRoom(id) {
+  const r = allRooms.find(r => r.id === id);
+  document.getElementById('modalTitle').textContent = 'Edit Room';
+  document.getElementById('roomId').value = r.id;
+  document.getElementById('roomNumber').value = r.roomNumber;
+  document.getElementById('roomType').value = r.type;
+  document.getElementById('roomPrice').value = r.pricePerNight;
+  document.getElementById('roomStatus').value = r.status;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function saveRoom() {
+  const id = document.getElementById('roomId').value;
+  const data = {
+    roomNumber: document.getElementById('roomNumber').value,
+    type: document.getElementById('roomType').value,
+    pricePerNight: parseFloat(document.getElementById('roomPrice').value),
+    status: document.getElementById('roomStatus').value,
+  };
+  const url    = id ? `${API}/rooms/${id}` : `${API}/rooms`;
+  const method = id ? 'PUT' : 'POST';
+  await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  closeModal();
+  loadRooms();
+}
+
+async function deleteRoom(id) {
+  if (!confirm('Delete this room?')) return;
+  await fetch(`${API}/rooms/${id}`, { method: 'DELETE' });
+  loadRooms();
+}
+
+loadRooms();
+</script>
+</body>
+</html>

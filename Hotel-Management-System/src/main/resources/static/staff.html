@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Staff — Hotel Management</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">🏨 HotelMS</div>
+  <a href="index.html"    class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+  <a href="rooms.html"    class="nav-item"><span class="nav-icon">🛏️</span> Rooms</a>
+  <a href="guests.html"   class="nav-item"><span class="nav-icon">👥</span> Guests</a>
+  <a href="bookings.html" class="nav-item"><span class="nav-icon">📅</span> Bookings</a>
+  <a href="billing.html"  class="nav-item"><span class="nav-icon">💰</span> Billing</a>
+  <a href="staff.html"    class="nav-item active"><span class="nav-icon">👷</span> Staff</a>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <h1>Staff</h1>
+    <p>Manage hotel staff members</p>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <h2>All Staff</h2>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search staff..." oninput="filterStaff()">
+        <button class="btn btn-primary" onclick="openModal()">+ Add Staff</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Salary</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="staffTable">
+        <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Staff</h2>
+    <input type="hidden" id="staffId">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="staffName" placeholder="Jane Doe">
+      </div>
+      <div class="form-group">
+        <label>Role</label>
+        <select id="staffRole">
+          <option>Receptionist</option>
+          <option>Housekeeping</option>
+          <option>Manager</option>
+          <option>Security</option>
+          <option>Chef</option>
+          <option>Maintenance</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="staffEmail" placeholder="jane@hotel.com">
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="text" id="staffPhone" placeholder="9876543210">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Salary (₹)</label>
+        <input type="number" id="staffSalary" placeholder="25000">
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="staffStatus">
+          <option>ACTIVE</option>
+          <option>INACTIVE</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveStaff()">Save Staff</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8080/api';
+let allStaff = [];
+
+async function loadStaff() {
+  allStaff = await fetch(`${API}/staff`).then(r => r.json());
+  renderStaff(allStaff);
+}
+
+function renderStaff(staff) {
+  const tbody = document.getElementById('staffTable');
+  if (staff.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No staff found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = staff.map(s => `
+    <tr>
+      <td><strong>${s.name}</strong></td>
+      <td><span class="badge badge-info">${s.role}</span></td>
+      <td>${s.email}</td>
+      <td>${s.phone}</td>
+      <td>₹${s.salary?.toLocaleString()}</td>
+      <td>${s.status === 'ACTIVE'
+        ? '<span class="badge badge-success">ACTIVE</span>'
+        : '<span class="badge badge-gray">INACTIVE</span>'}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn btn-sm btn-primary" onclick="editStaff(${s.id})">Edit</button>
+          <button class="btn btn-sm btn-danger"  onclick="deleteStaff(${s.id})">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterStaff() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  renderStaff(allStaff.filter(s =>
+    s.name.toLowerCase().includes(q) || s.role.toLowerCase().includes(q)
+  ));
+}
+
+function openModal() {
+  document.getElementById('modalTitle').textContent = 'Add Staff';
+  document.getElementById('staffId').value = '';
+  ['staffName','staffEmail','staffPhone','staffSalary'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function editStaff(id) {
+  const s = allStaff.find(s => s.id === id);
+  document.getElementById('modalTitle').textContent = 'Edit Staff';
+  document.getElementById('staffId').value     = s.id;
+  document.getElementById('staffName').value   = s.name;
+  document.getElementById('staffEmail').value  = s.email;
+  document.getElementById('staffPhone').value  = s.phone;
+  document.getElementById('staffSalary').value = s.salary;
+  document.getElementById('staffRole').value   = s.role;
+  document.getElementById('staffStatus').value = s.status;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function saveStaff() {
+  const id   = document.getElementById('staffId').value;
+  const data = {
+    name:   document.getElementById('staffName').value,
+    email:  document.getElementById('staffEmail').value,
+    phone:  document.getElementById('staffPhone').value,
+    salary: parseFloat(document.getElementById('staffSalary').value),
+    role:   document.getElementById('staffRole').value,
+    status: document.getElementById('staffStatus').value,
+  };
+  const url    = id ? `${API}/staff/${id}` : `${API}/staff`;
+  const method = id ? 'PUT' : 'POST';
+  await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  closeModal();
+  loadStaff();
+}
+
+async function deleteStaff(id) {
+  if (!confirm('Delete this staff member?')) return;
+  await fetch(`${API}/staff/${id}`, { method: 'DELETE' });
+  loadStaff();
+}
+
+loadStaff();
+</script>
+</body>
+</html>

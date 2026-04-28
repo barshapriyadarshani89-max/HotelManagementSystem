@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Bookings — Hotel Management</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">🏨 HotelMS</div>
+  <a href="index.html"    class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+  <a href="rooms.html"    class="nav-item"><span class="nav-icon">🛏️</span> Rooms</a>
+  <a href="guests.html"   class="nav-item"><span class="nav-icon">👥</span> Guests</a>
+  <a href="bookings.html" class="nav-item active"><span class="nav-icon">📅</span> Bookings</a>
+  <a href="billing.html"  class="nav-item"><span class="nav-icon">💰</span> Billing</a>
+  <a href="staff.html"    class="nav-item"><span class="nav-icon">👷</span> Staff</a>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <h1>Bookings</h1>
+    <p>Manage room bookings, check-ins and check-outs</p>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <h2>All Bookings</h2>
+      <button class="btn btn-primary" onclick="openModal()">+ New Booking</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Guest</th>
+          <th>Room</th>
+          <th>Check In</th>
+          <th>Check Out</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="bookingsTable">
+        <tr><td colspan="7" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>New Booking</h2>
+    <div class="form-group">
+      <label>Guest</label>
+      <select id="bookingGuest"></select>
+    </div>
+    <div class="form-group">
+      <label>Room</label>
+      <select id="bookingRoom"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Check In Date</label>
+        <input type="date" id="checkIn">
+      </div>
+      <div class="form-group">
+        <label>Check Out Date</label>
+        <input type="date" id="checkOut">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBooking()">Book Now</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8080/api';
+let allBookings = [];
+
+async function loadBookings() {
+  allBookings = await fetch(`${API}/bookings`).then(r => r.json());
+  renderBookings(allBookings);
+}
+
+function renderBookings(bookings) {
+  const tbody = document.getElementById('bookingsTable');
+  if (bookings.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No bookings yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = bookings.map(b => `
+    <tr>
+      <td>#${b.id}</td>
+      <td><strong>${b.guest?.name || '-'}</strong></td>
+      <td>${b.room?.roomNumber || '-'} (${b.room?.type || ''})</td>
+      <td>${b.checkInDate}</td>
+      <td>${b.checkOutDate}</td>
+      <td>${statusBadge(b.status)}</td>
+      <td>
+        <div class="action-btns">
+          ${b.status === 'BOOKED'      ? `<button class="btn btn-sm btn-success" onclick="checkIn(${b.id})">Check In</button>` : ''}
+          ${b.status === 'CHECKED_IN'  ? `<button class="btn btn-sm btn-warning" onclick="checkOut(${b.id})">Check Out</button>` : ''}
+          ${b.status === 'BOOKED'      ? `<button class="btn btn-sm btn-danger"  onclick="cancelBooking(${b.id})">Cancel</button>` : ''}
+          ${b.status === 'CHECKED_OUT' ? `<button class="btn btn-sm btn-primary" onclick="generateBill(${b.id})">Bill</button>` : ''}
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function statusBadge(s) {
+  const map = { BOOKED: 'badge-info', CHECKED_IN: 'badge-success', CHECKED_OUT: 'badge-gray', CANCELLED: 'badge-danger' };
+  return `<span class="badge ${map[s] || 'badge-gray'}">${s}</span>`;
+}
+
+async function openModal() {
+  const [guests, rooms] = await Promise.all([
+    fetch(`${API}/guests`).then(r => r.json()),
+    fetch(`${API}/rooms/available`).then(r => r.json()),
+  ]);
+  document.getElementById('bookingGuest').innerHTML = guests.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+  document.getElementById('bookingRoom').innerHTML  = rooms.map(r  => `<option value="${r.id}">${r.roomNumber} — ${r.type} (₹${r.pricePerNight})</option>`).join('');
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function saveBooking() {
+  const data = {
+    guest: { id: parseInt(document.getElementById('bookingGuest').value) },
+    room:  { id: parseInt(document.getElementById('bookingRoom').value) },
+    checkInDate:  document.getElementById('checkIn').value,
+    checkOutDate: document.getElementById('checkOut').value,
+  };
+  await fetch(`${API}/bookings`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  closeModal();
+  loadBookings();
+}
+
+async function checkIn(id) {
+  await fetch(`${API}/bookings/${id}/checkin`, { method: 'PUT' });
+  loadBookings();
+}
+
+async function checkOut(id) {
+  await fetch(`${API}/bookings/${id}/checkout`, { method: 'PUT' });
+  loadBookings();
+}
+
+async function cancelBooking(id) {
+  if (!confirm('Cancel this booking?')) return;
+  await fetch(`${API}/bookings/${id}/cancel`, { method: 'PUT' });
+  loadBookings();
+}
+
+async function generateBill(bookingId) {
+  await fetch(`${API}/bills/generate/${bookingId}`, { method: 'POST' });
+  alert('Bill generated! Go to Billing page to view.');
+  window.location.href = 'billing.html';
+}
+
+loadBookings();
+</script>
+</body>
+</html>

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Guests — Hotel Management</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">🏨 HotelMS</div>
+  <a href="index.html"    class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+  <a href="rooms.html"    class="nav-item"><span class="nav-icon">🛏️</span> Rooms</a>
+  <a href="guests.html"   class="nav-item active"><span class="nav-icon">👥</span> Guests</a>
+  <a href="bookings.html" class="nav-item"><span class="nav-icon">📅</span> Bookings</a>
+  <a href="billing.html"  class="nav-item"><span class="nav-icon">💰</span> Billing</a>
+  <a href="staff.html"    class="nav-item"><span class="nav-icon">👷</span> Staff</a>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <h1>Guests</h1>
+    <p>Manage guest information</p>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <h2>All Guests</h2>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search guests..." oninput="filterGuests()">
+        <button class="btn btn-primary" onclick="openModal()">+ Add Guest</button>
+      </div>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>ID Proof</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="guestsTable">
+        <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add Guest</h2>
+    <input type="hidden" id="guestId">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Full Name</label>
+        <input type="text" id="guestName" placeholder="John Doe">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="guestEmail" placeholder="john@email.com">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="text" id="guestPhone" placeholder="9876543210">
+      </div>
+      <div class="form-group">
+        <label>ID Proof</label>
+        <select id="guestIdProof">
+          <option>Aadhar</option>
+          <option>Passport</option>
+          <option>Driving License</option>
+          <option>Voter ID</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Address</label>
+      <input type="text" id="guestAddress" placeholder="City, State">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGuest()">Save Guest</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8080/api';
+let allGuests = [];
+
+async function loadGuests() {
+  allGuests = await fetch(`${API}/guests`).then(r => r.json());
+  renderGuests(allGuests);
+}
+
+function renderGuests(guests) {
+  const tbody = document.getElementById('guestsTable');
+  if (guests.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No guests found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = guests.map(g => `
+    <tr>
+      <td><strong>${g.name}</strong></td>
+      <td>${g.email}</td>
+      <td>${g.phone}</td>
+      <td><span class="badge badge-info">${g.idProof}</span></td>
+      <td>
+        <div class="action-btns">
+          <button class="btn btn-sm btn-primary" onclick="editGuest(${g.id})">Edit</button>
+          <button class="btn btn-sm btn-danger"  onclick="deleteGuest(${g.id})">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterGuests() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  renderGuests(allGuests.filter(g =>
+    g.name.toLowerCase().includes(q) || g.email.toLowerCase().includes(q)
+  ));
+}
+
+function openModal() {
+  document.getElementById('modalTitle').textContent = 'Add Guest';
+  document.getElementById('guestId').value = '';
+  ['guestName','guestEmail','guestPhone','guestAddress'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function editGuest(id) {
+  const g = allGuests.find(g => g.id === id);
+  document.getElementById('modalTitle').textContent = 'Edit Guest';
+  document.getElementById('guestId').value      = g.id;
+  document.getElementById('guestName').value    = g.name;
+  document.getElementById('guestEmail').value   = g.email;
+  document.getElementById('guestPhone').value   = g.phone;
+  document.getElementById('guestAddress').value = g.address;
+  document.getElementById('guestIdProof').value = g.idProof;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+async function saveGuest() {
+  const id   = document.getElementById('guestId').value;
+  const data = {
+    name: document.getElementById('guestName').value,
+    email: document.getElementById('guestEmail').value,
+    phone: document.getElementById('guestPhone').value,
+    address: document.getElementById('guestAddress').value,
+    idProof: document.getElementById('guestIdProof').value,
+  };
+  const url    = id ? `${API}/guests/${id}` : `${API}/guests`;
+  const method = id ? 'PUT' : 'POST';
+  await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+  closeModal();
+  loadGuests();
+}
+
+async function deleteGuest(id) {
+  if (!confirm('Delete this guest?')) return;
+  await fetch(`${API}/guests/${id}`, { method: 'DELETE' });
+  loadGuests();
+}
+
+loadGuests();
+</script>
+</body>
+</html>

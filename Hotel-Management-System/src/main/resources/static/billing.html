@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Billing — Hotel Management</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-logo">🏨 HotelMS</div>
+  <a href="index.html"    class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+  <a href="rooms.html"    class="nav-item"><span class="nav-icon">🛏️</span> Rooms</a>
+  <a href="guests.html"   class="nav-item"><span class="nav-icon">👥</span> Guests</a>
+  <a href="bookings.html" class="nav-item"><span class="nav-icon">📅</span> Bookings</a>
+  <a href="billing.html"  class="nav-item active"><span class="nav-icon">💰</span> Billing</a>
+  <a href="staff.html"    class="nav-item"><span class="nav-icon">👷</span> Staff</a>
+</aside>
+
+<main class="main">
+  <div class="page-header">
+    <h1>Billing</h1>
+    <p>View and manage all invoices</p>
+  </div>
+
+  <div class="table-card">
+    <div class="table-header">
+      <h2>All Bills</h2>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Bill ID</th>
+          <th>Guest</th>
+          <th>Room</th>
+          <th>Nights</th>
+          <th>Amount</th>
+          <th>GST (18%)</th>
+          <th>Grand Total</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="billsTable">
+        <tr><td colspan="9" class="empty-state">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const API = 'http://localhost:8080/api';
+
+async function loadBills() {
+  const bills = await fetch(`${API}/bills`).then(r => r.json());
+  const tbody = document.getElementById('billsTable');
+  if (bills.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No bills yet</td></tr>';
+    return;
+  }
+  tbody.innerHTML = bills.map(b => {
+    const nights = daysBetween(b.booking?.checkInDate, b.booking?.checkOutDate);
+    return `
+      <tr>
+        <td>#${b.id}</td>
+        <td><strong>${b.booking?.guest?.name || '-'}</strong></td>
+        <td>${b.booking?.room?.roomNumber || '-'}</td>
+        <td>${nights}</td>
+        <td>₹${b.totalAmount?.toFixed(2)}</td>
+        <td>₹${b.taxAmount?.toFixed(2)}</td>
+        <td><strong>₹${b.grandTotal?.toFixed(2)}</strong></td>
+        <td>${payBadge(b.paymentStatus)}</td>
+        <td>
+          ${b.paymentStatus === 'UNPAID'
+            ? `<button class="btn btn-sm btn-success" onclick="payBill(${b.id})">Mark Paid</button>`
+            : '<span style="color:var(--muted);font-size:0.75rem;">Paid ✓</span>'}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function payBadge(status) {
+  return status === 'PAID'
+    ? '<span class="badge badge-success">PAID</span>'
+    : '<span class="badge badge-danger">UNPAID</span>';
+}
+
+function daysBetween(d1, d2) {
+  if (!d1 || !d2) return '-';
+  return Math.round((new Date(d2) - new Date(d1)) / (1000 * 60 * 60 * 24));
+}
+
+async function payBill(id) {
+  await fetch(`${API}/bills/${id}/pay`, { method: 'PUT' });
+  loadBills();
+}
+
+loadBills();
+</script>
+</body>
+</html>
